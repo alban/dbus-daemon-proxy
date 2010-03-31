@@ -164,25 +164,29 @@ new_connection_cb (DBusServer *server,
 }
 
 void
-start_bus ()
+start_bus (gchar *host, gchar *bind, gchar *port, gchar *family)
 {
   /* the address that we are listening for D-Bus connections on */
-  gchar *dbus_srv_addr = "tcp:host=localhost,bind=*,port=8082,family=ipv4";
+  gchar *dbus_srv_addr;
 
   /* the server that's listening on dbus_srv_addr */
   DBusServer *dbus_srv;
 
   DBusError error;
 
+  dbus_srv_addr = g_strdup_printf
+    ("tcp:host=%s,bind=%s,port=%s,family=%s",
+     host?:"localhost", bind?:"*", port?:"8080", family?:"ipv4");
+  g_print ("%s", dbus_srv_addr);
 
   dbus_error_init (&error);
-
   dbus_srv = dbus_server_listen (dbus_srv_addr, &error);
   if (dbus_srv == NULL)
   {
-    g_error ("Cannot listen on '%s'", dbus_srv_addr);
+    g_printerr ("Cannot listen on '%s'", dbus_srv_addr);
     exit (1);
   }
+  g_free (dbus_srv_addr);
 
   dbus_server_set_new_connection_function (dbus_srv,
       new_connection_cb,
@@ -194,6 +198,12 @@ static void
 usage (char *name, int ecode)
 {
   g_printerr ("Usage: %s [--system | --session | --address ADDRESS]\n", name);
+  g_printerr ("        [--host <host>]\n");
+  g_printerr ("        [--bind <bind>]\n");
+  g_printerr ("        [--port <port>]\n");
+  g_printerr ("        [--family <family>]\n");
+  g_printerr ("\n");
+  g_printerr ("port\n");
   exit (ecode);
 }
 
@@ -202,6 +212,10 @@ main (int argc, char *argv[])
 {
   DBusBusType type = DBUS_BUS_SESSION;
   char *address = NULL;
+  gchar *host = NULL;
+  gchar *bind = NULL;
+  gchar *port = NULL;
+  gchar *family = NULL;
   int i;
   GError *error = NULL;
   GMainLoop *mainloop = NULL;
@@ -218,15 +232,55 @@ main (int argc, char *argv[])
     else if (!strcmp (arg, "--session"))
       type = DBUS_BUS_SESSION;
     else if (!strcmp (arg, "--address"))
+    {
+      if (i+1 < argc)
       {
-        if (i+1 < argc)
-          {
-            address = argv[i+1];
-            i++;
-          }
-        else
-          usage (argv[0], 1);
+        address = argv[i+1];
+        i++;
       }
+      else
+        usage (argv[0], 1);
+    }
+    else if (!strcmp (arg, "--host"))
+    {
+      if (i+1 < argc)
+      {
+        host = argv[i+1];
+        i++;
+      }
+      else
+        usage (argv[0], 1);
+    }
+    else if (!strcmp (arg, "--bind"))
+    {
+      if (i+1 < argc)
+      {
+        bind = argv[i+1];
+        i++;
+      }
+      else
+        usage (argv[0], 1);
+    }
+    else if (!strcmp (arg, "--port"))
+    {
+      if (i+1 < argc)
+      {
+        port = argv[i+1];
+        i++;
+      }
+      else
+        usage (argv[0], 1);
+    }
+    else if (!strcmp (arg, "--family"))
+    {
+      if (i+1 < argc)
+      {
+        family = argv[i+1];
+        i++;
+      }
+      else
+        usage (argv[0], 1);
+    }
     else
       usage (argv[0], 1);
   }
@@ -243,7 +297,7 @@ main (int argc, char *argv[])
   dbus_connection_add_filter (dbus_g_connection_get_connection (master_conn),
       master_filter_cb, NULL, NULL);
 
-  start_bus ();
+  start_bus (host, bind, port, family);
 
   mainloop = g_main_loop_new (NULL, FALSE);
   g_main_loop_run (mainloop);
