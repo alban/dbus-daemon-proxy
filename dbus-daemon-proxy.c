@@ -29,6 +29,8 @@ static DBusConnection *dbus_conn;
 /* the connection to the real server */
 static DBusGConnection *master_conn;
 
+gboolean verbose = FALSE;
+
 static DBusHandlerResult
 filter_cb (DBusConnection *conn,
            DBusMessage *msg,
@@ -38,11 +40,13 @@ filter_cb (DBusConnection *conn,
   gint len;
   guint32 serial;
 
-  g_debug ("New message from client: type='%d' path='%s' iface='%s' member='%s'",
-      dbus_message_get_type (msg),
-      dbus_message_get_path (msg),
-      dbus_message_get_interface (msg),
-      dbus_message_get_member (msg));
+  if (verbose)
+    g_print ("New message from client: type='%d' path='%s' iface='%s'"
+        " member='%s'\n",
+        dbus_message_get_type (msg),
+        dbus_message_get_path (msg),
+        dbus_message_get_interface (msg),
+        dbus_message_get_member (msg));
 
   if (dbus_message_get_type (msg) == DBUS_MESSAGE_TYPE_METHOD_CALL &&
       strcmp (dbus_message_get_path (msg),
@@ -60,14 +64,14 @@ filter_cb (DBusConnection *conn,
     dbus_local_name = dbus_bus_get_unique_name
       (dbus_g_connection_get_connection (master_conn));
 
-    g_debug ("Hello received");
+    g_print ("Hello received\n");
 
     welcome = dbus_message_new_method_return (msg);
     if (!dbus_message_append_args (welcome,
           DBUS_TYPE_STRING, &dbus_local_name,
           DBUS_TYPE_INVALID))
     {
-      g_error ("Cannot reply to Hello message");
+      g_printerr ("Cannot reply to Hello message\n");
       exit (1);
     }
     dbus_connection_send (conn, welcome, &serial);
@@ -81,7 +85,7 @@ filter_cb (DBusConnection *conn,
       strcmp (dbus_message_get_member (msg), "Disconnected") == 0)
   {
     /* connection was disconnected */
-    g_debug ("connection was disconnected");
+    g_print ("connection was disconnected\n");
     dbus_connection_close (dbus_conn);
     dbus_connection_unref (dbus_conn);
     dbus_conn = NULL;
@@ -113,11 +117,13 @@ master_filter_cb (DBusConnection *conn,
   if (!dbus_conn)
     return;
 
-  g_debug ("New message from server: type='%d' path='%s' iface='%s' member='%s'",
-      dbus_message_get_type (msg),
-      dbus_message_get_path (msg),
-      dbus_message_get_interface (msg),
-      dbus_message_get_member (msg));
+  if (verbose)
+    g_print ("New message from server: type='%d' path='%s' iface='%s'"
+        " member='%s'\n",
+        dbus_message_get_type (msg),
+        dbus_message_get_path (msg),
+        dbus_message_get_interface (msg),
+        dbus_message_get_member (msg));
 
   if (!dbus_message_marshal (msg, &marshalled, &len))
     goto out;
@@ -136,7 +142,6 @@ allow_all_connections (DBusConnection *conn,
                        unsigned long uid,
                        void *data)
 {
-  g_debug ("allow_all_connections: Called");
   return TRUE;
 }
 
@@ -148,11 +153,11 @@ new_connection_cb (DBusServer *server,
 {
   if (dbus_conn != NULL)
   {
-    g_error ("Already connect, reject new connection");
+    g_printerr ("Already connect, reject new connection\n");
     return;
   }
 
-  g_debug ("New connection");
+  g_print ("New connection\n");
 
   dbus_connection_ref (conn);
   dbus_connection_setup_with_g_main (conn, NULL);
@@ -177,13 +182,13 @@ start_bus (gchar *host, gchar *bind, gchar *port, gchar *family)
   dbus_srv_addr = g_strdup_printf
     ("tcp:host=%s,bind=%s,port=%s,family=%s",
      host?:"localhost", bind?:"*", port?:"8080", family?:"ipv4");
-  g_print ("%s", dbus_srv_addr);
+  g_print ("Listen on address: %s\n", dbus_srv_addr);
 
   dbus_error_init (&error);
   dbus_srv = dbus_server_listen (dbus_srv_addr, &error);
   if (dbus_srv == NULL)
   {
-    g_printerr ("Cannot listen on '%s'", dbus_srv_addr);
+    g_printerr ("Cannot listen on '%s'\n", dbus_srv_addr);
     exit (1);
   }
   g_free (dbus_srv_addr);
@@ -281,6 +286,8 @@ main (int argc, char *argv[])
       else
         usage (argv[0], 1);
     }
+    else if (!strcmp (arg, "--verbose"))
+      verbose = TRUE;
     else
       usage (argv[0], 1);
   }
@@ -288,7 +295,7 @@ main (int argc, char *argv[])
   master_conn = dbus_g_bus_get (type, &error);
   if (!master_conn)
   {
-    g_error ("Failed to open connection to session bus: %s\n",
+    g_printerr ("Failed to open connection to session bus: %s\n",
         error->message);
     g_clear_error(&error);
     return 1;
