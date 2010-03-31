@@ -23,21 +23,11 @@
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus-glib-lowlevel.h>
 
-static GMainLoop *mainloop = NULL;
-
-/* the address that we are listening for D-Bus connections on */
-gchar *dbus_srv_addr = "tcp:host=localhost,bind=*,port=8082,family=ipv4";
-
-/* the server that's listening on dbus_srv_addr */
-static DBusServer *dbus_srv;
-
 /* the connection to dbus_srv from a local client, or NULL */
 static DBusConnection *dbus_conn;
 
-/* our unique D-Bus name on the real bus */
-const gchar *dbus_local_name;
-
-DBusGConnection *master_conn;
+/* the connection to the real server */
+static DBusGConnection *master_conn;
 
 static DBusHandlerResult
 filter_cb (DBusConnection *conn,
@@ -64,6 +54,11 @@ filter_cb (DBusConnection *conn,
       strcmp (dbus_message_get_member (msg), "Hello") == 0)
   {
     DBusMessage *welcome;
+    /* our unique D-Bus name on the real bus */
+    const gchar *dbus_local_name;
+
+    dbus_local_name = dbus_bus_get_unique_name
+      (dbus_g_connection_get_connection (master_conn));
 
     g_debug ("Hello received");
 
@@ -171,7 +166,14 @@ new_connection_cb (DBusServer *server,
 void
 start_bus ()
 {
+  /* the address that we are listening for D-Bus connections on */
+  gchar *dbus_srv_addr = "tcp:host=localhost,bind=*,port=8082,family=ipv4";
+
+  /* the server that's listening on dbus_srv_addr */
+  DBusServer *dbus_srv;
+
   DBusError error;
+
 
   dbus_error_init (&error);
 
@@ -202,6 +204,8 @@ main (int argc, char *argv[])
   char *address = NULL;
   int i;
   GError *error = NULL;
+  GMainLoop *mainloop = NULL;
+
 
   g_type_init ();
 
@@ -235,11 +239,6 @@ main (int argc, char *argv[])
     g_clear_error(&error);
     return 1;
   }
-
-  dbus_local_name = dbus_bus_get_unique_name
-    (dbus_g_connection_get_connection (master_conn));
-
-  g_debug ("Unique name: '%s'", dbus_local_name);
 
   dbus_connection_add_filter (dbus_g_connection_get_connection (master_conn),
       master_filter_cb, NULL, NULL);
