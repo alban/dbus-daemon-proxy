@@ -1,0 +1,5 @@
+For dbus-daemon, use:
+DBUS_SESSION_BUS_ADDRESS=tcp:host=myn900,port=8082,family=ipv4 dbus-monitor
+
+For D-Feet, use the menu File-> Connect to other bus
+
