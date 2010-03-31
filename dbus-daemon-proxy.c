@@ -188,14 +188,46 @@ start_bus ()
   dbus_server_setup_with_g_main (dbus_srv, NULL);
 }
 
-int
-main ()
+static void
+usage (char *name, int ecode)
 {
+  g_printerr ("Usage: %s [--system | --session | --address ADDRESS]\n", name);
+  exit (ecode);
+}
+
+int
+main (int argc, char *argv[])
+{
+  DBusBusType type = DBUS_BUS_SESSION;
+  char *address = NULL;
+  int i;
   GError *error = NULL;
 
   g_type_init ();
 
-  master_conn = dbus_g_bus_get (DBUS_BUS_SESSION, &error);
+  for (i = 1; i < argc; i++)
+  {
+    char *arg = argv[i];
+
+    if (!strcmp (arg, "--system"))
+      type = DBUS_BUS_SYSTEM;
+    else if (!strcmp (arg, "--session"))
+      type = DBUS_BUS_SESSION;
+    else if (!strcmp (arg, "--address"))
+      {
+        if (i+1 < argc)
+          {
+            address = argv[i+1];
+            i++;
+          }
+        else
+          usage (argv[0], 1);
+      }
+    else
+      usage (argv[0], 1);
+  }
+
+  master_conn = dbus_g_bus_get (type, &error);
   if (!master_conn)
   {
     g_error ("Failed to open connection to session bus: %s\n",
